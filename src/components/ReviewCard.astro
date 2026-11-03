@@ -1,0 +1,66 @@
+---
+import { Image } from 'astro:assets';
+
+import RatingBadge from './RatingBadge.astro';
+import FundingPill from './FundingPill.astro';
+import { formatDate, formatPrice } from '../lib/site';
+import type { CollectionEntry } from 'astro:content';
+
+interface Props {
+  review: CollectionEntry<'reviews'>;
+  authorName?: string;
+  categoryLabel?: string;
+  eager?: boolean;
+}
+
+const { review, authorName, categoryLabel, eager = false } = Astro.props;
+const d = review.data;
+---
+
+<article
+  class="group relative flex flex-col overflow-hidden rounded-2xl border border-line bg-surface transition duration-300 hover:-translate-y-1 hover:shadow-[0_12px_32px_-12px_rgb(26_23_18/0.25)]"
+  data-category={d.category}
+  data-funding={d.funding}
+>
+  <a href={`/reviews/${review.id}/`} class="absolute inset-0 z-10">
+    <span class="sr-only">{d.brand} {d.title}</span>
+  </a>
+  <div class="relative aspect-[16/10] overflow-hidden border-b border-line">
+    {
+      d.cover ? (
+        <Image
+          src={d.cover}
+          alt={`${d.brand} ${d.title}`}
+          width={800}
+          loading={eager ? 'eager' : 'lazy'}
+          class="h-full w-full object-cover transition duration-500 group-hover:scale-[1.04]"
+        />
+      ) : (
+        <div class="flex h-full w-full items-center justify-center bg-ink">
+          <span class="font-display text-6xl font-semibold text-signal">{d.brand[0]}</span>
+        </div>
+      )
+    }
+    <div class="absolute right-3 top-3">
+      <RatingBadge rating={d.rating} />
+    </div>
+  </div>
+  <div class="flex flex-1 flex-col gap-2 p-5">
+    <p class="eyebrow text-signal-deep">{categoryLabel ?? d.category}</p>
+    <h3
+      class="font-display text-xl font-semibold leading-snug tracking-tight group-hover:underline group-hover:decoration-signal group-hover:decoration-2 group-hover:underline-offset-4"
+    >
+      {d.brand} {d.title}
+    </h3>
+    <p class="line-clamp-2 text-sm leading-relaxed text-soft">{d.excerpt}</p>
+    <div
+      class="mt-auto flex items-center justify-between gap-3 border-t border-line pt-3 text-xs text-soft"
+    >
+      <span class="flex items-center gap-2 truncate">
+        <FundingPill funding={d.funding} />
+        <span class="truncate">{authorName ?? d.author}</span>
+      </span>
+      <span class="shrink-0 tabular-nums">{formatDate(d.publishedAt)} · {formatPrice(d.price)}</span>
+    </div>
+  </div>
+</article>

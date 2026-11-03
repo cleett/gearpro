@@ -1,0 +1,38 @@
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "gearpro-admin",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "routes": [
+    {
+      "pattern": "admin.gearpro.kr",
+      "custom_domain": true
+    }
+  ],
+  "d1_databases": [
+    {
+      "binding": "METRICS_DB",
+      "database_name": "gearpro-metrics",
+      "database_id": "388d5682-f0a3-4468-9c74-9edbc7eec860"
+    }
+  ],
+  "send_email": [
+    {
+      "name": "EMAIL_SENDER"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "DRAFT_IMAGES",
+      "bucket_name": "gearpro-media"
+    }
+  ],
+  "vars": {
+    "SITE_URL": "https://gearpro.kr",
+    "KEYSTATIC_GITHUB_REPO": "gearprokr/gearpro",
+    "ADMIN_EMAILS": "clee11@gmail.com",
+    "ACCESS_TEAM": "odd-scene-5ed3",
+    "ACCESS_AUD": "b2ffaec18e8896e3d2e91cc1964997fa46c364eb007c75ad9c8b225c0d7d0646"
+  }
+}

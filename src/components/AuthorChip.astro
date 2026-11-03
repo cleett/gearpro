@@ -1,0 +1,36 @@
+---
+import { Image } from 'astro:assets';
+
+import type { CollectionEntry } from 'astro:content';
+
+interface Props {
+  author: CollectionEntry<'authors'>;
+  size?: 'sm' | 'md';
+}
+
+const { author, size = 'sm' } = Astro.props;
+const avatarSize = size === 'sm' ? 'h-8 w-8' : 'h-12 w-12';
+---
+
+<span class="inline-flex items-center gap-2">
+  {
+    author.data.avatar ? (
+      <Image
+        src={author.data.avatar}
+        alt={author.data.name}
+        width={64}
+        class:list={[avatarSize, 'rounded-full border border-line object-cover']}
+      />
+    ) : (
+      <span
+        class:list={[
+          avatarSize,
+          'flex items-center justify-center rounded-full bg-ink font-display text-sm font-semibold text-paper',
+        ]}
+      >
+        {author.data.name[0]}
+      </span>
+    )
+  }
+  <span class="text-sm font-medium text-ink">{author.data.name}</span>
+</span>

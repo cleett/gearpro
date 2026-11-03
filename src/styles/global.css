@@ -1,0 +1,136 @@
+@import 'tailwindcss';
+@plugin '@tailwindcss/typography';
+
+@theme {
+  --font-sans: 'Pretendard Variable', Pretendard, -apple-system, 'Segoe UI', sans-serif;
+  --font-display: 'Fraunces Variable', 'Noto Serif KR Variable', 'Noto Serif KR', ui-serif, Georgia, serif;
+
+  --color-paper: #f4f2ec;
+  --color-surface: #fdfcf9;
+  --color-ink: #1a1712;
+  --color-soft: #6f675a;
+  --color-line: #e3ded1;
+  --color-signal: #e4571d;
+  --color-signal-deep: #a83a0b;
+  --color-gold: #a16207;
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: var(--color-paper);
+    color: var(--color-ink);
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    background-color: var(--color-signal);
+    color: var(--color-paper);
+  }
+}
+
+@layer components {
+  .eyebrow {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+
+  .filter-chip {
+    border-radius: 9999px;
+    border: 1px solid var(--color-line);
+    background-color: var(--color-surface);
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--color-ink);
+    transition:
+      background-color 0.15s,
+      border-color 0.15s,
+      color 0.15s;
+  }
+
+  .filter-chip:hover {
+    border-color: var(--color-ink);
+  }
+
+  .filter-chip[data-active='true'] {
+    background-color: var(--color-ink);
+    border-color: var(--color-ink);
+    color: var(--color-paper);
+  }
+
+  .filter-chip-sm {
+    padding: 0.375rem 0.75rem;
+    font-size: 0.8125rem;
+  }
+
+  .auth-tab {
+    border-radius: 9999px;
+    padding: 0.625rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--color-soft);
+    transition:
+      background-color 0.15s,
+      color 0.15s,
+      box-shadow 0.15s;
+  }
+
+  .auth-tab[data-active='true'] {
+    background-color: var(--color-ink);
+    color: var(--color-paper);
+    box-shadow: 0 1px 4px rgb(26 23 18 / 0.25);
+  }
+
+  .prose-review {
+    --tw-prose-body: #37322a;
+    --tw-prose-headings: var(--color-ink);
+    --tw-prose-lead: var(--color-soft);
+    --tw-prose-links: var(--color-signal-deep);
+    --tw-prose-bold: var(--color-ink);
+    --tw-prose-quotes: var(--color-ink);
+    --tw-prose-quote-borders: var(--color-signal);
+    --tw-prose-bullets: var(--color-signal);
+    --tw-prose-counters: var(--color-signal-deep);
+    --tw-prose-hr: var(--color-line);
+    --tw-prose-th-borders: var(--color-line);
+    --tw-prose-td-borders: var(--color-line);
+    --tw-prose-code: var(--color-signal-deep);
+
+    font-size: 1.0625rem;
+    line-height: 1.9;
+    word-break: keep-all;
+  }
+
+  .prose-review h2,
+  .prose-review h3,
+  .prose-review h4 {
+    font-family: var(--font-display);
+    font-weight: 560;
+    letter-spacing: -0.01em;
+  }
+
+  .prose-review h2 {
+    margin-top: 2.4em;
+    font-size: 1.6em;
+    padding-top: 0.15em;
+  }
+
+  .prose-review blockquote {
+    font-family: var(--font-display);
+    font-style: italic;
+    font-size: 1.2em;
+    line-height: 1.7;
+  }
+
+  .prose-review a {
+    font-weight: 500;
+    text-decoration-thickness: 1.5px;
+    text-underline-offset: 3px;
+  }
+}

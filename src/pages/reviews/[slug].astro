@@ -1,0 +1,261 @@
+---
+import { Image } from 'astro:assets';
+import { getCollection, render } from 'astro:content';
+
+import AuthorChip from '../../components/AuthorChip.astro';
+import FundingPill from '../../components/FundingPill.astro';
+import ProsCons from '../../components/ProsCons.astro';
+import ReviewCard from '../../components/ReviewCard.astro';
+import BaseLayout from '../../layouts/Base.astro';
+import { buildTaxonomy, byRatingDesc } from '../../lib/taxonomy';
+import { formatDate, formatPrice } from '../../lib/site';
+
+export async function getStaticPaths() {
+  const reviews = await getCollection('reviews');
+  return reviews.map((review) => ({
+    params: { slug: review.id },
+    props: { review },
+  }));
+}
+
+const { review } = Astro.props;
+const { Content } = await render(review);
+const d = review.data;
+
+const categories = await getCollection('categories');
+const taxonomy = buildTaxonomy(categories);
+const chain = taxonomy.breadcrumb(d.category);
+
+const authors = await getCollection('authors');
+const author = authors.find((a) => a.id === d.author);
+
+const related = (await getCollection('reviews'))
+  .filter((r) => r.id !== review.id && r.data.category === d.category)
+  .sort(byRatingDesc)
+  .slice(0, 2);
+const relatedAuthors = new Map(authors.map((a) => [a.id, a.data.name]));
+---
+
+<BaseLayout title={`${d.brand} ${d.title}`} description={d.excerpt}>
+  <article class="mx-auto max-w-3xl px-5 pt-10 pb-16">
+    <a
+      href="/reviews/"
+      class="text-sm font-medium text-soft transition hover:text-ink"
+    >
+      ← 전체 리뷰
+    </a>
+
+    <header class="mt-8">
+      <p class="eyebrow text-signal-deep">
+        {
+          chain.map((c, i) => (
+            <>
+              <a href={`/categories/${c.slug}/`} class="hover:underline">
+                {c.name}
+              </a>
+              {i < chain.length - 1 && <span class="mx-1 text-soft" aria-hidden>›</span>}
+            </>
+          ))
+        }
+        <span class="mx-1 text-soft" aria-hidden>·</span>
+        {d.brand}
+      </p>
+      <h1 class="mt-4 font-display text-4xl font-semibold leading-[1.12] tracking-tight md:text-6xl">
+        {d.brand} {d.title}
+      </h1>
+      <p class="mt-5 font-display text-xl italic leading-relaxed text-soft md:text-2xl">
+        {d.excerpt}
+      </p>
+      <div class="mt-6 flex flex-wrap items-center gap-x-6 gap-y-3 border-y border-line py-4">
+        {author ? <AuthorChip author={author} /> : <span class="text-sm font-medium">{d.author}</span>}
+        <span class="text-sm text-soft">{formatDate(d.publishedAt)}</span>
+        <span class="text-sm text-soft tabular-nums">{formatPrice(d.price)}</span>
+        <FundingPill funding={d.funding} />
+        <div class="ml-auto flex items-center gap-3" data-metrics data-slug={review.id}>
+          <button
+            type="button"
+            id="like-btn"
+            class="flex items-center gap-1.5 rounded-full border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-soft transition hover:border-signal hover:text-signal"
+            aria-pressed="false"
+            aria-label="이 리뷰에 좋아요"
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden>
+              <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z"></path>
+            </svg>
+            <span data-like-count>–</span>
+          </button>
+          <span
+            class="flex items-center gap-1.5 text-xs text-soft tabular-nums"
+            title="조회수 (고유 방문자 기준)"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden>
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+              <circle cx="12" cy="12" r="3"></circle>
+            </svg>
+            <span data-view-count>–</span>
+          </span>
+        </div>
+      </div>
+    </header>
+
+    {
+      d.funding === 'sponsor' && (
+        <div class="mt-8 flex items-start gap-3 rounded-2xl border border-gold/40 bg-gold/10 p-4 text-sm leading-relaxed">
+          <span class="mt-0.5 shrink-0"><FundingPill funding="sponsor" /></span>
+          <p>
+            이 리뷰는 <strong>{d.sponsor ?? '협찬사'}</strong>로부터 제품을 제공받아 작성되었습니다.
+            평점과 내용은 내돈내산 리뷰와 동일한 루브릭으로, 외부 개입 없이 결정됩니다.
+          </p>
+        </div>
+      )
+    }
+
+    {
+      d.cover && (
+        <div class="mt-8 overflow-hidden rounded-2xl border border-line">
+          <Image
+            src={d.cover}
+            alt={`${d.brand} ${d.title}`}
+            width={1400}
+            loading="eager"
+            class="w-full object-cover"
+          />
+        </div>
+      )
+    }
+
+    <div class="mt-10 rounded-2xl border border-line bg-surface p-6 md:p-8">
+      <div class="grid items-start gap-8 md:grid-cols-[auto_1fr]">
+        <div class="flex items-center gap-4 md:flex-col md:items-center">
+          <div
+            class="flex h-20 w-20 flex-col items-center justify-center rounded-2xl bg-ink text-paper"
+          >
+            <span class="font-display text-3xl font-semibold leading-none">
+              {d.rating.toFixed(1)}
+            </span>
+            <span class="mt-1 text-[10px] font-medium uppercase tracking-widest text-paper/50">
+              / 10
+            </span>
+          </div>
+          <div class="w-24 md:w-16">
+            <div class="h-1.5 overflow-hidden rounded-full bg-line">
+              <div class="h-full rounded-full bg-signal" style={`width: ${d.rating * 10}%`}></div>
+            </div>
+            <p class="mt-2 text-center text-[10px] uppercase tracking-widest text-soft">
+              기어프로 평점
+            </p>
+          </div>
+        </div>
+        <ProsCons pros={d.pros} cons={d.cons} />
+      </div>
+    </div>
+
+    <div class="prose prose-review mt-12 max-w-none">
+      <Content />
+    </div>
+
+    {
+      d.specs.length > 0 && (
+        <section class="mt-14" aria-labelledby="specs-heading">
+          <h2 id="specs-heading" class="eyebrow text-soft">
+            주요 제원
+          </h2>
+          <dl class="mt-4 overflow-hidden rounded-2xl border border-line bg-surface">
+            {d.specs.map((spec, index) => (
+              <div
+                class:list={[
+                  'grid grid-cols-2 gap-4 px-5 py-3.5 text-sm',
+                  index !== d.specs.length - 1 && 'border-b border-line',
+                ]}
+              >
+                <dt class="text-soft">{spec.label}</dt>
+                <dd class="text-right font-medium sm:text-left">{spec.value}</dd>
+              </div>
+            ))}
+          </dl>
+        </section>
+      )
+    }
+  </article>
+
+  {
+    related.length > 0 && (
+      <section class="mx-auto max-w-6xl px-5 pb-8" aria-labelledby="related-heading">
+        <div class="flex items-center gap-4">
+          <h2 id="related-heading" class="eyebrow text-soft">
+            {d.category}의 다른 리뷰
+          </h2>
+          <div class="h-px flex-1 bg-line"></div>
+        </div>
+        <div class="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {related.map((r) => (
+            <ReviewCard review={r} authorName={relatedAuthors.get(r.data.author)} />
+          ))}
+        </div>
+      </section>
+    )
+  }
+</BaseLayout>
+
+<script>
+  const root = document.querySelector<HTMLElement>('[data-metrics]');
+  if (root) {
+    const slug = root.dataset.slug ?? '';
+    const likeBtn = root.querySelector<HTMLButtonElement>('#like-btn')!;
+    const likeCount = root.querySelector<HTMLElement>('[data-like-count]')!;
+    const viewCount = root.querySelector<HTMLElement>('[data-view-count]')!;
+    const fmt = (n: number | undefined) =>
+      typeof n === 'number' && Number.isFinite(n) ? n.toLocaleString('ko-KR') : '–';
+    const likedKey = `gp:liked:${slug}`;
+
+    function setLiked(on: boolean) {
+      likeBtn.setAttribute('aria-pressed', String(on));
+      likeBtn.classList.toggle('border-signal', on);
+      likeBtn.classList.toggle('bg-signal', on);
+      likeBtn.classList.toggle('text-paper', on);
+      likeBtn.classList.toggle('text-soft', !on);
+      likeBtn.classList.toggle('hover:border-signal', !on);
+      likeBtn.classList.toggle('hover:text-signal', !on);
+    }
+
+    fetch(`/api/metrics/${slug}`)
+      .then((r) => r.json() as Promise<{ views?: number; likes?: number }>)
+      .then((d) => {
+        likeCount.textContent = fmt(d.likes);
+        viewCount.textContent = fmt(d.views);
+      })
+      .catch(() => {});
+
+    if (localStorage.getItem(likedKey) === '1') setLiked(true);
+
+    const viewedKey = `gp:viewed:${slug}`;
+    if (!sessionStorage.getItem(viewedKey)) {
+      sessionStorage.setItem(viewedKey, '1');
+      navigator.sendBeacon(`/api/metrics/${slug}/view`);
+    }
+
+    let pending = false;
+    likeBtn.addEventListener('click', async () => {
+      if (pending) return;
+      pending = true;
+      const on = localStorage.getItem(likedKey) !== '1';
+      try {
+        const res = await fetch(`/api/metrics/${slug}/like`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ on }),
+        });
+        const data = (await res.json()) as { ok: boolean; likes?: number };
+        if (data.ok) {
+          localStorage.setItem(likedKey, on ? '1' : '0');
+          setLiked(on);
+          likeCount.textContent = fmt(data.likes);
+        }
+      } catch {
+        // 네트워크 실패 시 현재 상태 유지
+      } finally {
+        pending = false;
+      }
+    });
+  }
+</script>

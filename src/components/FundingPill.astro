@@ -1,0 +1,19 @@
+---
+interface Props {
+  funding: 'self' | 'sponsor';
+}
+
+const { funding } = Astro.props;
+---
+
+{
+  funding === 'sponsor' ? (
+    <span class="inline-flex shrink-0 items-center rounded-full bg-gold px-2.5 py-0.5 text-[11px] font-semibold tracking-wide text-paper">
+      스폰서
+    </span>
+  ) : (
+    <span class="inline-flex shrink-0 items-center rounded-full border border-line bg-surface px-2.5 py-0.5 text-[11px] font-semibold tracking-wide text-soft">
+      내돈내산
+    </span>
+  )
+}

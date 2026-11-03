@@ -1,0 +1,103 @@
+---
+import { getCollection } from 'astro:content';
+
+import ReviewCard from '../../components/ReviewCard.astro';
+import BaseLayout from '../../layouts/Base.astro';
+import { buildTaxonomy, byRatingDesc } from '../../lib/taxonomy';
+
+export async function getStaticPaths() {
+  const categories = await getCollection('categories');
+  return categories.map((category) => ({
+    params: { slug: category.id },
+    props: { category },
+  }));
+}
+
+const { category } = Astro.props;
+const categories = await getCollection('categories');
+const taxonomy = buildTaxonomy(categories);
+
+const includeSlugs = new Set([category.id, ...taxonomy.descendants(category.id)]);
+const reviews = (await getCollection('reviews'))
+  .filter((r) => includeSlugs.has(r.data.category))
+  .sort(byRatingDesc);
+const authorNames = new Map((await getCollection('authors')).map((a) => [a.id, a.data.name]));
+const children = taxonomy.childrenOf.get(category.id) ?? [];
+const parent = category.data.parent
+  ? taxonomy.bySlug.get(category.data.parent)
+  : undefined;
+const chain = taxonomy.breadcrumb(category.id);
+---
+
+<BaseLayout title={category.data.name} description={category.data.description ?? `${category.data.name} 카테고리의 기어프로 리뷰 모음.`}>
+  <section class="mx-auto max-w-6xl px-5 pt-14 pb-20">
+    <nav class="flex flex-wrap items-center gap-2 text-sm text-soft" aria-label="카테고리 경로">
+      {
+        chain.map((c, i) => (
+          <>
+            {i > 0 && <span aria-hidden>›</span>}
+            {i < chain.length - 1 ? (
+              <a href={`/categories/${c.slug}/`} class="transition-colors hover:text-ink">
+                {c.name}
+              </a>
+            ) : (
+              <span class="font-medium text-ink">{c.name}</span>
+            )}
+          </>
+        ))
+      }
+    </nav>
+
+    <h1 class="mt-4 font-display text-4xl font-semibold tracking-tight md:text-6xl">
+      {category.data.name}
+    </h1>
+    {category.data.description && (
+      <p class="mt-3 max-w-2xl leading-relaxed text-soft">{category.data.description}</p>
+    )}
+
+    {
+      children.length > 0 && (
+        <div class="mt-6 flex flex-wrap gap-2">
+          {children.map((child) => (
+            <a
+              href={`/categories/${child}/`}
+              class="filter-chip filter-chip-sm"
+            >
+              › {taxonomy.nameOf(child)}
+            </a>
+          ))}
+        </div>
+      )
+    }
+
+    {
+      parent && (
+        <p class="mt-6 text-sm text-soft">
+          같은 흐름의 다른 카테고리:
+          <a href={`/categories/${parent.id}/`} class="font-medium text-ink underline decoration-signal decoration-2 underline-offset-4">
+            {parent.data.name} 전체 보기
+          </a>
+        </p>
+      )
+    }
+
+    <div class="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+      {
+        reviews.map((review) => (
+          <ReviewCard
+            review={review}
+            authorName={authorNames.get(review.data.author)}
+            categoryLabel={taxonomy.labelOf(review.data.category)}
+          />
+        ))
+      }
+    </div>
+    {
+      reviews.length === 0 && (
+        <p class="mt-10 text-sm text-soft">
+          이 카테고리의 리뷰가 아직 없습니다. 조금만 기다려 주세요.
+        </p>
+      )
+    }
+  </section>
+</BaseLayout>

@@ -1,0 +1,110 @@
+---
+import { Image } from 'astro:assets';
+import { getCollection } from 'astro:content';
+
+import BaseLayout from '../layouts/Base.astro';
+import { SITE_NAME } from '../lib/site';
+
+const authors = await getCollection('authors');
+
+const principles = [
+  {
+    title: '내돈내산이 기본입니다',
+    body: '보도자료 샘플도, 대여 제품도 없습니다. 기본은 리테일 가격에, 우리 돈으로 구매한 제품입니다. 협찬을 받은 리뷰는 스폰서 표시로 명확히 구분합니다.',
+  },
+  {
+    title: '몇 달씩 사용합니다',
+    body: '테스트 기간은 최소 3~6개월입니다. 배터리 열화, 펌웨어 문제, 마모 같은 장기적인 결함은 짧은 테스트에서는 절대 보이지 않습니다.',
+  },
+  {
+    title: '근거를 공개합니다',
+    body: '점수는 디자인·성능·가성비를 다루는 고정 루브릭에서 나옵니다. 우리가 추천하는 제품이라면, 테스트가 끝난 뒤에도 계속 손이 가는 이유가 있는 제품입니다.',
+  },
+];
+---
+
+<BaseLayout title="소개" description={`${SITE_NAME}의 리뷰 방식: 직접 구매하고, 몇 달씩 쓰고, 고정 루브릭으로 점수를 매깁니다.`}>
+  <section class="mx-auto max-w-3xl px-5 pt-14 pb-16">
+    <p class="eyebrow text-signal-deep">소개</p>
+    <h1 class="mt-4 font-display text-4xl font-semibold leading-[1.12] tracking-tight md:text-6xl">
+      광고도, 미련도, 후회도 없는 리뷰.
+    </h1>
+    <p class="mt-6 text-lg leading-relaxed text-soft">
+      {SITE_NAME}은 대부분의 기어 리뷰가 일주일 안에, 공짜 샘플로, 이미 다음 런칭을 준비하는
+      사람의 손에서 쓰여지는 일에 의문에서 출발했습니다. 오디오, 카메라, 자전거, EDC, 주방,
+      홈오피스 기어를 다루지만 — 실제로 함께 살아본 뒤에만 이야기합니다.
+    </p>
+  </section>
+
+  <section class="mx-auto max-w-6xl px-5 pb-16" aria-labelledby="method-heading">
+    <div class="flex items-center gap-4">
+      <h2 id="method-heading" class="eyebrow text-soft">리뷰 방식</h2>
+      <div class="h-px flex-1 bg-line"></div>
+    </div>
+    <ol class="mt-8 grid gap-6 md:grid-cols-3">
+      {
+        principles.map((principle, index) => (
+          <li class="rounded-2xl border border-line bg-surface p-6">
+            <p class="font-display text-4xl font-semibold text-signal">{index + 1}</p>
+            <h3 class="mt-3 font-display text-xl font-semibold tracking-tight">{principle.title}</h3>
+            <p class="mt-2 text-sm leading-relaxed text-soft">{principle.body}</p>
+          </li>
+        ))
+      }
+    </ol>
+    <div class="mt-8 rounded-2xl border border-line bg-ink p-6 text-paper md:p-8">
+      <p class="eyebrow text-paper/50">공시 및 협찬 정책</p>
+      <ul class="mt-3 max-w-3xl space-y-2 text-sm leading-relaxed text-paper/80">
+        <li>· 협찬 리뷰는 카드와 본문 상단에 <strong>스폰서</strong> 표시와 협찬사 명칭이 항상 노출됩니다.</li>
+        <li>· 협찬 리뷰도 내돈내산 리뷰와 동일한 루브릭으로 평가하며, 스폰서는 점수에 개입할 수 없습니다.</li>
+        <li>· 스폰서 리뷰는 기어 랭킹에서 제외됩니다.</li>
+        <li>· 제조사는 독자들과 같은 시점에 리뷰를 봅니다.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="mx-auto max-w-6xl px-5 pb-20" aria-labelledby="team-heading">
+    <div class="flex items-center gap-4">
+      <h2 id="team-heading" class="eyebrow text-soft">에디터</h2>
+      <div class="h-px flex-1 bg-line"></div>
+    </div>
+    <div class="mt-8 grid gap-6 md:grid-cols-3">
+      {
+        authors.map((author) => (
+          <div class="rounded-2xl border border-line bg-surface p-6">
+            {author.data.avatar && (
+              <Image
+                src={author.data.avatar}
+                alt={author.data.name}
+                width={128}
+                class="h-16 w-16 rounded-full border border-line object-cover"
+              />
+            )}
+            <h3 class="mt-4 font-display text-xl font-semibold tracking-tight">{author.data.name}</h3>
+            <p class="eyebrow mt-1 text-signal-deep">{author.data.role}</p>
+            <p class="mt-3 text-sm leading-relaxed text-soft">{author.data.bio}</p>
+          </div>
+        ))
+      }
+    </div>
+  </section>
+  <section class="mx-auto max-w-6xl px-5 pb-20" aria-labelledby="join-heading">
+    <div class="rounded-3xl bg-ink px-8 py-12 text-paper md:px-12">
+      <p class="eyebrow text-paper/50">리뷰어 모집</p>
+      <h2 id="join-heading" class="mt-4 font-display text-2xl font-semibold tracking-tight md:text-3xl">
+        직접 리뷰를 쓰고 싶다면?
+      </h2>
+      <p class="mt-3 max-w-2xl text-sm leading-relaxed text-paper/80">
+        소셜 계정 또는 이메일로 포털에 가입하면 관리자 검토 후 에디터 권한이 부여됩니다. 에디터는
+        포털에서 초안을 작성하고, 승인 시 매거진에 게시됩니다. 조회수·좋아요 기준 정산도 포털에서
+        투명하게 확인할 수 있습니다.
+      </p>
+      <a
+        href="/reviewer/"
+        class="mt-6 inline-flex rounded-full bg-signal px-6 py-3 text-sm font-semibold text-paper transition hover:bg-paper hover:text-ink"
+      >
+        리뷰어 지원하기 →
+      </a>
+    </div>
+  </section>
+</BaseLayout>

@@ -1,0 +1,7 @@
+{
+  "name": "gearpro-admin",
+  "private": true,
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250830.0"
+  }
+}

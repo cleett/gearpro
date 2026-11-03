@@ -1,0 +1,161 @@
+---
+import { Image } from 'astro:assets';
+import { getCollection } from 'astro:content';
+
+import RatingBadge from '../components/RatingBadge.astro';
+import BaseLayout from '../layouts/Base.astro';
+import { buildTaxonomy, byRatingDesc } from '../lib/taxonomy';
+import { formatDate, formatPrice } from '../lib/site';
+
+const reviews = (await getCollection('reviews'))
+  .filter((r) => r.data.funding !== 'sponsor')
+  .sort(byRatingDesc);
+const categories = await getCollection('categories');
+const taxonomy = buildTaxonomy(categories);
+---
+
+<BaseLayout
+  title="기어 랭킹"
+  description="기어프로 리뷰 평점 기준 랭킹. 종합과 카테고리별로 확인하세요."
+>
+  <section class="mx-auto max-w-4xl px-5 pt-14 pb-20">
+    <h1 class="font-display text-4xl font-semibold tracking-tight md:text-6xl">기어 랭킹</h1>
+    <p class="mt-3 text-soft">
+      내돈내산 리뷰만 순위에 포함되며, 리뷰 평점(10점 만점) 기준으로 자동 집계됩니다. 같은 점수면
+      최신 리뷰가 앞에 옵니다.
+    </p>
+
+    <div class="mt-8 flex flex-wrap gap-2" role="group" aria-label="랭킹 카테고리 필터">
+      <button type="button" data-filter="all" class="filter-chip" data-active="true">종합</button>
+      {
+        taxonomy.topLevel.map((category) => (
+          <button type="button" data-filter={category.id} class="filter-chip">
+            {category.data.name}
+          </button>
+        ))
+      }
+    </div>
+
+    <ol class="mt-10 space-y-3">
+      {
+        reviews.map((review, index) => {
+          const d = review.data;
+          return (
+            <li
+              class="group relative flex items-center gap-4 rounded-2xl border border-line bg-surface p-4 transition duration-300 hover:-translate-y-0.5 hover:shadow-[0_12px_32px_-16px_rgb(26_23_18/0.3)] sm:gap-5"
+              data-category={d.category}
+            >
+              <a href={`/reviews/${review.id}/`} class="absolute inset-0 z-10">
+                <span class="sr-only">{d.brand} {d.title}</span>
+              </a>
+              <span
+                class:list={[
+                  'w-10 shrink-0 text-center font-display text-3xl font-semibold',
+                  index < 3 ? 'text-signal' : 'text-soft',
+                ]}
+                data-rank
+              >
+                {index + 1}
+              </span>
+              <div class="hidden w-24 shrink-0 overflow-hidden rounded-lg border border-line sm:block">
+                {d.cover ? (
+                  <Image
+                    src={d.cover}
+                    alt={`${d.brand} ${d.title}`}
+                    width={200}
+                    loading="lazy"
+                    class="aspect-[16/10] w-full object-cover"
+                  />
+                ) : (
+                  <div class="flex aspect-[16/10] w-full items-center justify-center bg-ink">
+                    <span class="font-display text-2xl font-semibold text-signal">{d.brand[0]}</span>
+                  </div>
+                )}
+              </div>
+              <div class="min-w-0 flex-1">
+                <p class="eyebrow text-signal-deep">{taxonomy.labelOf(d.category)}</p>
+                <h2 class="truncate font-display text-lg font-semibold tracking-tight">
+                  {d.brand} {d.title}
+                </h2>
+                <p class="mt-0.5 text-xs text-soft tabular-nums">
+                  {formatDate(d.publishedAt)} · {formatPrice(d.price)}
+                </p>
+              </div>
+              <RatingBadge rating={d.rating} />
+            </li>
+          );
+        })
+      }
+    </ol>
+    <p id="empty-state" class="mt-10 hidden text-sm text-soft">
+      이 카테고리의 랭킹이 아직 없습니다.
+    </p>
+  </section>
+</BaseLayout>
+
+<script type="application/json" data-taxonomy is:inline
+  set:html={JSON.stringify({ children: Object.fromEntries(taxonomy.childrenOf) })}
+/>
+
+<script>
+  const taxonomy = JSON.parse(
+    document.querySelector<HTMLScriptElement>('[data-taxonomy]')?.textContent ?? '{}',
+  ) as { children: Record<string, string[]> };
+
+  const chips = Array.from(document.querySelectorAll<HTMLButtonElement>('[data-filter]'));
+  const rows = Array.from(document.querySelectorAll<HTMLElement>('[data-category]'));
+  const emptyState = document.getElementById('empty-state');
+  const validSlugs = new Set(chips.map((c) => c.dataset.filter ?? ''));
+
+  function descendants(slug: string): string[] {
+    const out: string[] = [];
+    const stack = [...(taxonomy.children[slug] ?? [])];
+    while (stack.length) {
+      const s = stack.pop() as string;
+      out.push(s);
+      stack.push(...(taxonomy.children[s] ?? []));
+    }
+    return out;
+  }
+
+  let active = 'all';
+
+  function apply() {
+    const allowed = active === 'all' ? null : new Set([active, ...descendants(active)]);
+    let visible = 0;
+    for (const row of rows) {
+      const show = !allowed || allowed.has(row.dataset.category ?? '');
+      row.classList.toggle('hidden', !show);
+      if (!show) continue;
+      visible++;
+      const rank = row.querySelector<HTMLElement>('[data-rank]');
+      if (rank) {
+        rank.textContent = String(visible);
+        rank.classList.toggle('text-signal', visible <= 3);
+        rank.classList.toggle('text-soft', visible > 3);
+      }
+    }
+    for (const chip of chips) {
+      chip.dataset.active = String(chip.dataset.filter === active);
+    }
+    emptyState?.classList.toggle('hidden', visible > 0);
+  }
+
+  for (const chip of chips) {
+    chip.addEventListener('click', () => {
+      active = chip.dataset.filter ?? 'all';
+      const url = new URL(window.location.href);
+      if (active === 'all') {
+        url.searchParams.delete('category');
+      } else {
+        url.searchParams.set('category', active);
+      }
+      window.history.replaceState(null, '', url.pathname + url.search);
+      apply();
+    });
+  }
+
+  const initial = new URLSearchParams(window.location.search).get('category');
+  if (initial && validSlugs.has(initial)) active = initial;
+  apply();
+</script>

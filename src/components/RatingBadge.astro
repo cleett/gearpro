@@ -1,0 +1,19 @@
+---
+interface Props {
+  rating: number;
+  class?: string;
+}
+
+const { rating, class: className = '' } = Astro.props;
+---
+
+<div
+  class:list={[
+    'flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-xl bg-ink text-paper shadow-sm',
+    className,
+  ]}
+  aria-label={`10점 만점에 ${rating.toFixed(1)}점`}
+>
+  <span class="font-display text-lg font-semibold leading-none">{rating.toFixed(1)}</span>
+  <span class="mt-0.5 text-[9px] font-medium uppercase tracking-widest text-paper/50">/ 10</span>
+</div>

@@ -1,0 +1,403 @@
+---
+export const prerender = false;
+
+import { getCollection } from 'astro:content';
+
+import BaseLayout from '../../layouts/Base.astro';
+import { getCfEnv } from '../../lib/auth';
+import { getMetricsEnv } from '../../lib/metrics';
+import { hasRole, getSessionUser } from '../../lib/session';
+
+interface DraftRow {
+  id: number;
+  slug: string;
+  title: string;
+  excerpt: string;
+  category: string;
+  brand: string;
+  price: number;
+  rating: number;
+  pros: string;
+  cons: string;
+  specs: string;
+  content: string;
+  cover_r2_key: string | null;
+  status: string;
+  review_note: string | null;
+  updated_at: string;
+}
+
+const sessionUser = await getSessionUser(Astro.request);
+const { db } = await getMetricsEnv();
+
+let accessError: string | null = null;
+let editing: DraftRow | null = null;
+let myDrafts: DraftRow[] = [];
+let categories: { id: string; label: string }[] = [];
+
+if (!sessionUser) {
+  accessError = '로그인이 필요합니다.';
+} else if (!hasRole(sessionUser, 'editor') && !hasRole(sessionUser, 'admin')) {
+  accessError = '에디터 권한이 필요합니다. 관리자에게 승급을 요청하세요.';
+} else if (!db) {
+  accessError = '메트릭 데이터베이스에 연결할 수 없습니다.';
+} else {
+  const mapped = await db
+    .prepare('SELECT author FROM authors_auth WHERE email = ?')
+    .bind(sessionUser.email)
+    .first<{ author: string }>();
+  if (!mapped) {
+    accessError = '먼저 포털에서 리뷰어 프로필을 등록하세요.';
+  } else {
+    const cats = await getCollection('categories');
+    const byId = new Map(cats.map((c) => [c.id, c]));
+    categories = cats.map((c) => {
+      const parent = c.data.parent ? byId.get(c.data.parent) : undefined;
+      return { id: c.id, label: parent ? `${parent.data.name} › ${c.data.name}` : c.data.name };
+    });
+
+    try {
+      const editId = Astro.url.searchParams.get('edit');
+      if (editId && /^\d+$/.test(editId)) {
+        const row = await db
+          .prepare('SELECT * FROM drafts WHERE id = ? AND author = ?')
+          .bind(Number(editId), mapped.author)
+          .first<DraftRow>();
+        if (row && row.status === 'pending') {
+          editing = row;
+        }
+      }
+
+      const { results } = await db
+        .prepare('SELECT * FROM drafts WHERE author = ? ORDER BY updated_at DESC')
+        .bind(mapped.author)
+        .all<DraftRow>();
+      myDrafts = results ?? [];
+    } catch {
+      accessError = '데이터베이스가 일시적으로 사용할 수 없습니다. 잠시 후 다시 시도하세요.';
+    }
+  }
+}
+
+const statusLabel: Record<string, string> = {
+  pending: '검토 대기',
+  published: '게시됨',
+  rejected: '반려됨',
+};
+const statusClass: Record<string, string> = {
+  pending: 'border-line text-soft',
+  published: 'bg-ink text-paper border-ink',
+  rejected: 'border-gold/50 text-gold',
+};
+
+const editData = editing
+  ? {
+      id: editing.id,
+      slug: editing.slug,
+      title: editing.title,
+      excerpt: editing.excerpt,
+      category: editing.category,
+      brand: editing.brand,
+      price: editing.price,
+      rating: editing.rating,
+      pros: JSON.parse(editing.pros).join('\n'),
+      cons: JSON.parse(editing.cons).join('\n'),
+      specs: (JSON.parse(editing.specs) as { label: string; value: string }[])
+        .map((s) => `${s.label} | ${s.value}`)
+        .join('\n'),
+      content: editing.content,
+      cover_r2_key: editing.cover_r2_key,
+    }
+  : null;
+---
+
+<BaseLayout title="내 초안">
+  <section class="mx-auto max-w-4xl px-5 pt-14 pb-20">
+    <div class="flex items-center justify-between gap-4">
+      <div>
+        <p class="eyebrow text-signal-deep">리뷰어 포털</p>
+        <h1 class="mt-3 font-display text-3xl font-semibold tracking-tight md:text-4xl">내 초안</h1>
+      </div>
+      <a href="/reviewer/" class="text-sm font-medium text-soft hover:text-ink">← 대시보드</a>
+    </div>
+
+    {
+      accessError ? (
+        <div class="mt-8 rounded-2xl border border-line bg-surface p-6 text-sm leading-relaxed text-soft">
+          {accessError}
+        </div>
+      ) : (
+        <>
+          <div class="mt-8 rounded-2xl border border-line bg-surface p-6">
+            <div class="flex items-center justify-between gap-4">
+              <h2 class="font-display text-xl font-semibold">
+                {editData ? `초안 수정 #${editData.id}` : '새 초안 작성'}
+              </h2>
+              {editData && (
+                <a href="/reviewer/drafts/" class="text-sm text-soft hover:text-ink">
+                  새 초안 쓰기 →
+                </a>
+              )}
+            </div>
+            <form id="draft-form" class="mt-5 grid gap-4" data-edit-id={editData?.id ?? ''}>
+              <div class="grid gap-4 sm:grid-cols-2">
+                <label class="text-sm">
+                  <span class="font-medium">URL 슬러그 * (소문자-하이픈)</span>
+                  <input
+                    name="slug"
+                    required
+                    pattern="[a-z0-9][a-z0-9-]{1,79}"
+                    value={editData?.slug ?? ''}
+                    disabled={!!editData}
+                    class="mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 disabled:opacity-50"
+                  />
+                </label>
+                <label class="text-sm">
+                  <span class="font-medium">카테고리 *</span>
+                  <select name="category" required class="mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2">
+                    {categories.map((c) => (
+                      <option value={c.id} selected={editData?.category === c.id}>
+                        {c.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label class="text-sm">
+                  <span class="font-medium">브랜드 *</span>
+                  <input name="brand" required maxlength="40" value={editData?.brand ?? ''} class="mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2" />
+                </label>
+                <label class="text-sm">
+                  <span class="font-medium">제품명 *</span>
+                  <input name="title" required maxlength="80" value={editData?.title ?? ''} class="mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2" />
+                </label>
+                <label class="text-sm">
+                  <span class="font-medium">가격 (원) *</span>
+                  <input name="price" type="number" min="0" required value={editData?.price ?? ''} class="mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 tabular-nums" />
+                </label>
+                <label class="text-sm">
+                  <span class="font-medium">평점 (0–10) *</span>
+                  <input name="rating" type="number" min="0" max="10" step="0.1" required value={editData?.rating ?? ''} class="mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 tabular-nums" />
+                </label>
+              </div>
+              <label class="block text-sm">
+                <span class="font-medium">요약 * (240자 이내)</span>
+                <textarea name="excerpt" required maxlength="240" rows="2" class="mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2">{editData?.excerpt ?? ''}</textarea>
+              </label>
+              <div class="grid gap-4 sm:grid-cols-2">
+                <label class="block text-sm">
+                  <span class="font-medium">좋았던 점 (줄바꿈으로 구분)</span>
+                  <textarea name="pros" rows="3" class="mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2">{editData?.pros ?? ''}</textarea>
+                </label>
+                <label class="block text-sm">
+                  <span class="font-medium">아쉬운 점 (줄바꿈으로 구분)</span>
+                  <textarea name="cons" rows="3" class="mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2">{editData?.cons ?? ''}</textarea>
+                </label>
+              </div>
+              <label class="block text-sm">
+                <span class="font-medium">주요 제원 (한 줄에 하나: 항목 | 값)</span>
+                <textarea name="specs" rows="3" placeholder="무게 | 268g" class="mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2">{editData?.specs ?? ''}</textarea>
+              </label>
+              <label class="block text-sm">
+                <span class="font-medium">본문 (MDX) *</span>
+                <textarea name="content" required rows="14" class="mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 font-mono text-xs leading-relaxed">{editData?.content ?? ''}</textarea>
+              </label>
+              <div class="rounded-xl border border-line bg-paper p-4">
+                <span class="text-sm font-medium">표지 이미지 (선택 · jpg/png/webp · 5MB 이하)</span>
+                <div class="mt-2 flex items-center gap-4">
+                  <img
+                    data-cover-preview
+                    src={editData?.cover_r2_key ? `/media/${editData.cover_r2_key}` : ''}
+                    alt="표지 미리보기"
+                    class:list={[
+                      'h-20 w-32 rounded-lg border border-line object-cover',
+                      !editData?.cover_r2_key && 'hidden',
+                    ]}
+                  />
+                  <input type="file" accept="image/jpeg,image/png,image/webp" data-cover-file class="text-sm" />
+                </div>
+                <input type="hidden" name="coverR2Key" value={editData?.cover_r2_key ?? ''} data-cover-key />
+                <p class="cover-note mt-2 hidden text-xs text-signal-deep"></p>
+              </div>
+              <div class="flex items-center gap-4">
+                <button
+                  type="submit"
+                  class="rounded-full bg-ink px-6 py-2.5 text-sm font-semibold text-paper transition hover:bg-signal-deep"
+                >
+                  {editData ? '초안 저장' : '초안 제출 (검토 대기)'}
+                </button>
+                {
+                  editData && (
+                    <button
+                      type="button"
+                      id="delete-draft"
+                      data-id={editData.id}
+                      class="rounded-full border border-gold/50 px-5 py-2.5 text-sm font-semibold text-gold transition hover:bg-gold/10"
+                    >
+                      초안 삭제
+                    </button>
+                  )
+                }
+              </div>
+              <p class="form-msg hidden text-sm"></p>
+            </form>
+          </div>
+
+          <div class="mt-10">
+            <h2 class="font-display text-xl font-semibold">내 초안 목록</h2>
+            <div class="mt-4 space-y-3">
+              {
+                myDrafts.map((d) => (
+                  <div class="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line bg-surface p-4">
+                    <div class="min-w-0">
+                      <p class="truncate font-medium">
+                        {d.brand} {d.title}
+                      </p>
+                      <p class="text-xs text-soft">
+                        /{d.slug}/ · {d.category} · 최종 수정 {d.updated_at}
+                      </p>
+                      {d.status === 'rejected' && d.review_note && (
+                        <p class="mt-1 text-xs text-gold">반려 사유: {d.review_note}</p>
+                      )}
+                    </div>
+                    <div class="flex items-center gap-3">
+                      <span class:list={['rounded-full border px-3 py-1 text-xs font-semibold', statusClass[d.status] ?? 'border-line']}>
+                        {statusLabel[d.status] ?? d.status}
+                      </span>
+                      {d.status === 'pending' && (
+                        <a href={`/reviewer/drafts/?edit=${d.id}`} class="text-sm font-medium text-ink underline decoration-signal underline-offset-4">
+                          편집
+                        </a>
+                      )}
+                      {d.status === 'published' && (
+                        <a href={`/reviews/${d.slug}/`} class="text-sm font-medium text-ink underline decoration-signal underline-offset-4">
+                          보기 →
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                ))
+              }
+              {
+                myDrafts.length === 0 && (
+                  <p class="rounded-2xl border border-line bg-surface p-6 text-sm text-soft">
+                    아직 초안이 없습니다. 위 폼에서 첫 리뷰를 작성해 보세요.
+                  </p>
+                )
+              }
+            </div>
+          </div>
+        </>
+      )
+    }
+  </section>
+</BaseLayout>
+
+<script>
+  const form = document.querySelector<HTMLFormElement>('#draft-form');
+  const authHint = '로그인 세션이 만료되었습니다. 새로고침 후 다시 시도하세요.';
+
+  function parseLines(v: FormDataEntryValue | null): string[] {
+    return String(v ?? '')
+      .split('\n')
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }
+
+  function parseSpecs(v: FormDataEntryValue | null): { label: string; value: string }[] {
+    return parseLines(v)
+      .map((line) => {
+        const [label, ...rest] = line.split('|');
+        return { label: label.trim(), value: rest.join('|').trim() };
+      })
+      .filter((s) => s.label && s.value);
+  }
+
+  const coverFile = document.querySelector<HTMLInputElement>('[data-cover-file]');
+  const coverPreview = document.querySelector<HTMLImageElement>('[data-cover-preview]');
+  const coverKeyInput = document.querySelector<HTMLInputElement>('[data-cover-key]');
+  const coverNote = document.querySelector<HTMLElement>('.cover-note');
+  if (coverFile && coverPreview && coverKeyInput && coverNote) {
+    coverFile.addEventListener('change', async () => {
+      const file = coverFile.files?.[0];
+      if (!file) return;
+      coverNote?.classList.remove('hidden');
+      coverNote.textContent = '이미지 업로드 중…';
+      const fd = new FormData();
+      fd.append('file', file);
+      try {
+        const res = await fetch('/api/reviewer/draft-image', { method: 'POST', body: fd });
+        const data = (await res.json()) as { ok: boolean; key?: string; url?: string; error?: string };
+        if (data.ok && data.key && data.url) {
+          coverKeyInput.value = data.key;
+          coverPreview.src = data.url;
+          coverPreview.classList.remove('hidden');
+          coverNote.textContent = '업로드 완료. 저장 시 함께 반영됩니다.';
+        } else {
+          coverNote.textContent = `업로드 실패: ${data.error ?? 'unknown'}`;
+        }
+      } catch {
+        coverNote.textContent = '업로드 실패: 네트워크 오류';
+      }
+    });
+  }
+
+  if (form) {
+    const msg = form.querySelector<HTMLElement>('.form-msg')!;
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const editId = form.dataset.editId;
+      msg.classList.remove('hidden');
+      msg.textContent = '저장 중…';
+      const fd = new FormData(form);
+      const payload = {
+        id: editId ? Number(editId) : undefined,
+        slug: String(fd.get('slug') ?? ''),
+        title: String(fd.get('title') ?? ''),
+        excerpt: String(fd.get('excerpt') ?? ''),
+        category: String(fd.get('category') ?? ''),
+        brand: String(fd.get('brand') ?? ''),
+        price: Number(fd.get('price') ?? 0),
+        rating: Number(fd.get('rating') ?? 0),
+        pros: parseLines(fd.get('pros')),
+        cons: parseLines(fd.get('cons')),
+        specs: parseSpecs(fd.get('specs')),
+        content: String(fd.get('content') ?? ''),
+        coverR2Key: String(fd.get('coverR2Key') ?? '') || null,
+      };
+      try {
+        const res = await fetch('/api/reviewer/drafts', {
+          method: editId ? 'PUT' : 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const data = (await res.json()) as { ok: boolean; error?: string };
+        if (data.ok) {
+          window.location.href = '/reviewer/drafts/';
+        } else {
+          msg.textContent =
+            data.error === 'login_required'
+              ? authHint
+              : `저장 실패: ${data.error ?? 'unknown'}`;
+        }
+      } catch {
+        msg.textContent = '네트워크 오류입니다. 다시 시도하세요.';
+      }
+    });
+  }
+
+  const deleteBtn = document.querySelector<HTMLButtonElement>('#delete-draft');
+  if (deleteBtn) {
+    deleteBtn.addEventListener('click', async () => {
+      if (!confirm('이 초안을 삭제할까요?')) return;
+      const res = await fetch('/api/reviewer/drafts', {
+        method: 'DELETE',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ id: Number(deleteBtn.dataset.id) }),
+      });
+      const data = (await res.json()) as { ok: boolean };
+      if (data.ok) {
+        window.location.href = '/reviewer/drafts/';
+      }
+    });
+  }
+</script>
